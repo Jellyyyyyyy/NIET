@@ -1,0 +1,7 @@
+venv
+__pycache__
+dist
+*.html
+*.csv
+*.xlsx
+*.nessus

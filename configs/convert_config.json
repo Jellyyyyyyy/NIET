@@ -1,0 +1,158 @@
+{
+  "mode": "convert",
+  "verbose": false,
+  "csv": "Ubuntu Machines_1452lr.csv",
+  "excel": "nessus_export_output.xlsx",
+  "software_exclusion_keywords": ["os", "startup", "start-up"],
+  "excel_config_path": "C:\\Users\\Jelly\\Documents\\Code\\Python\\Nessus scripts\\configs\\convert_config.json",
+  "excel_config": {
+    "remove_duplicates": true,
+    "table": {
+      "table_style": "TableStyleMedium9",
+      "show_first_column": false,
+      "show_last_column": false,
+      "show_row_stripes": false,
+      "show_column_stripes": false,
+      "header_fill": "A5A5A5",
+      "header_fill_type": "solid",
+      "header_font_color": "000000",
+      "cell_fill": "ffffff",
+      "cell_fill_type": "solid",
+      "cell_border": "thin",
+      "cell_font_color": "000000"
+    },
+    "status": {
+      "status_map": {
+        "-": "ffffff",
+        "Open": "FFC7CE",
+        "On-going": "FFEB9C",
+        "Closed": "FFFFFF",
+        "Declared": "82F073"
+      },
+      "status_fill_type": "solid"
+    },
+    "hosts": {
+      "sheet_name": "Hosts",
+      "table_name": "Hosts",
+      "headers": ["Hostname", "IP", "OS"],
+      "visible_columns": ["Hostname", "IP", "OS"],
+      "ip_match": ["", 1, ""],
+      "not_ip_match": [1, "", ""]
+    },
+    "sheet_options": {
+      "host_column_name": "Host",
+      "insert_mapping_columns_after": "Risk",
+      "mapping_columns": ["Hostname_original", "Hostname", "IP_original", "IP", "OS_original", "OS"],
+      "ip_match": ["", "", 1, "", "", ""],
+      "not_ip_match": [1, "", "", "", "", ""],
+      "mapping_columns_formula": {
+        "Hostname": "=IF(ISBLANK({Hostname_original_cell}), IF(ISBLANK(INDEX({hosts_table_name}!$A$2:$A${host_rows}, MATCH({IP_original_cell}, {hosts_table_name}!$B$2:$B${host_rows}, 0))), \"\", INDEX({hosts_table_name}!$A$2:$A${host_rows}, MATCH({IP_original_cell}, {hosts_table_name}!$B$2:$B${host_rows}, 0))), {Hostname_original_cell})",
+        "IP": "=IF(ISBLANK({IP_original_cell}), IF(ISBLANK(INDEX({hosts_table_name}!$B$2:$B${host_rows}, MATCH({Hostname_original_cell}, {hosts_table_name}!$A$2:$A${host_rows}, 0))), \"\", INDEX({hosts_table_name}!$B$2:$B${host_rows}, MATCH({Hostname_original_cell}, {hosts_table_name}!$A$2:$A${host_rows}, 0))), {IP_original_cell})",
+        "OS": "=IF(ISBLANK({OS_original_cell}), IF(ISBLANK(INDEX({hosts_table_name}!$C$2:$C${host_rows}, MATCH({ip_cell}, {hosts_table_name}!$B$2:$B${host_rows}, 0))), \"\", INDEX({hosts_table_name}!$C$2:$C${host_rows}, MATCH({ip_cell}, {hosts_table_name}!$B$2:$B${host_rows}, 0))), {OS_original_cell})"
+      },
+      "additional_columns": {"Status": "Open", "Remarks": ""},
+      "headers_to_remove": ["Host"]
+    },
+    "sheets": {
+      "vulnerabilities":{
+        "sheet_name": "Vulnerabilities",
+        "case_insensitive": true,
+        "filter": ["^None$", "^Low$", "^Medium$", "^High$", "^Critical$"],
+        "column_filter_lookup": ["^Risk$"],
+        "filter_exclude": [],
+        "visible_columns": ["Risk", "Hostname", "IP", "OS", "Name", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Status", "Remarks"],
+        "auto_width_columns": [],
+        "text_format_column": "Risk",
+        "text_format": {
+          "Low": "0000FF",
+          "Medium": "A0522D",
+          "High": "FF0000",
+          "Critical": "8B0000"
+        }
+      },
+      "compliance":{
+        "sheet_name": "Compliance",
+        "case_insensitive": true,
+        "filter": ["^WARNING$", "^FAILED$"],
+        "column_filter_lookup": ["^Risk$"],
+        "filter_exclude": [],
+        "visible_columns": ["Risk", "Hostname", "IP", "OS", "Name", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Status", "Remarks"],
+        "auto_width_columns": [],
+        "text_format_column": "Risk",
+        "text_format": {
+          "WARNING": "A0522D",
+          "FAILED": "FF0000"
+        }
+      },
+      "open_ports":{
+        "sheet_name": "Open Ports",
+        "case_insensitive": true,
+        "filter": ["Netstat Portscanner \\(SSH\\)", "Netstat Portscanner \\(WMI\\)"],
+        "column_filter_lookup": ["^Name$"],
+        "filter_exclude": [],
+        "visible_columns": ["Hostname", "IP", "OS", "Protocol", "Port", "Status", "Remarks"],
+        "auto_width_columns": []
+      },
+      "users":{
+        "sheet_name": "Users",
+        "case_insensitive": true,
+        "filter": ["^Linux User List Enumeration$", "^Enumerate Users via WMI$"],
+        "column_filter_lookup": ["^Name$"],
+        "filter_exclude": [],
+        "visible_columns": ["Hostname", "IP", "OS", "User", "Status", "Remarks"],
+        "auto_width_columns": [],
+        "extract_config": {
+          "case_insensitive": true,
+          "lookup_columns": ["^Name$"],
+          "extract_columns": ["^Plugin Output$"],
+          "extract_column_name": "User",
+          "linux": {
+              "lookup_values": ["^Linux User List Enumeration$"],
+              "extraction": {
+                  "regex": ["^User\\s*:\\s*(.+)$"],
+                  "exclude": []
+              }
+          },
+          "windows": {
+              "lookup_values": ["^Enumerate Users via WMI$"],
+              "extraction": {
+                  "regex": ["^Name\\s*:\\s*(.+)$"],
+                  "exclude": ["no\\.?\\s*of\\s*users"]
+              }
+          }
+        }
+
+      },
+      "installed_software":{
+        "sheet_name": "Installed Software",
+        "case_insensitive": true,
+        "filter": ["software enumeration"],
+        "column_filter_lookup": ["^Name$"],
+        "filter_exclude": ["identification", "startup", "start-up"],
+        "visible_columns": ["Hostname", "IP", "OS", "Installed Program", "Status", "Remarks"],
+        "auto_width_columns": [],
+
+        "extract_config": {
+          "case_insensitive": true,
+          "lookup_columns": ["^Name$"],
+          "extract_columns": ["^Plugin Output$"],
+          "extract_column_name": "Installed Program",
+          "linux": {
+              "lookup_values": ["ssh"],
+              "extraction": {
+                  "regex": [".*"],
+                  "exclude": ["list of packages", "^-+"]
+              }
+          },
+          "windows": {
+              "lookup_values": ["microsoft windows installed software enumeration"],
+              "extraction": {
+                  "regex": [".*installed on.*"],
+                  "exclude": ["the following software"]
+              }
+          }
+        }
+      }
+    }
+  }
+}

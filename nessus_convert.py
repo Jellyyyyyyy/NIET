@@ -1,3 +1,4 @@
+import json
 import re
 import csv
 from openpyxl import Workbook
@@ -26,60 +27,80 @@ def remove_duplicates(rows, keys):
     return unique_rows
 
 
-def create_table_and_style(sheet, table_name):
+def create_table_and_style(sheet, table_name, config=None):
     """
     Create an Excel table on the given sheet and apply header fill, font, and border styles.
     If the sheet has only a header row (no data), a dummy row is added so the table range is valid.
     """
-    # Ensure there's at least one data row (besides the header)
+    if config is None:
+        config = {}
+    
+    table_style = config.get("table_style", "TableStyleMedium9")
+    show_first_column = config.get("show_first_column", False)
+    show_last_column = config.get("show_last_column", False)
+    show_row_stripes = config.get("show_row_stripes", False)
+    show_column_stripes = config.get("show_column_stripes", False)
+    header_fill = config.get("header_fill", "A5A5A5")
+    header_fill_type = config.get("header_fill_type", "solid")
+    header_font_color = config.get("header_font_color", "000000")
+    cell_fill = config.get("cell_fill", "ffffff")
+    cell_fill_type = config.get("cell_fill_type", "solid")
+    cell_border = config.get("cell_border", "thin")
+    cell_font_color = config.get("cell_font_color", "000000")
+
     if sheet.max_row < 2:
         # Insert a dummy row with empty strings for each column
         sheet.append([""] * sheet.max_column)
     
     max_row = sheet.max_row
     max_col = sheet.max_column
+    
     table_range = f"A1:{get_column_letter(max_col)}{max_row}"
     tab = Table(displayName=table_name.replace(" ", ""), ref=table_range)
-    style = TableStyleInfo(name="TableStyleMedium9", showFirstColumn=False,
-                           showLastColumn=False, showRowStripes=False, showColumnStripes=False)
+    style = TableStyleInfo(name=table_style, showFirstColumn=show_first_column,
+                           showLastColumn=show_last_column, showRowStripes=show_row_stripes, showColumnStripes=show_column_stripes)
     tab.tableStyleInfo = style
     sheet.add_table(tab)
-    header_fill = PatternFill(start_color="A5A5A5", end_color="A5A5A5", fill_type="solid")
+    
+    thin_border = Border(left=Side(style=cell_border), right=Side(style=cell_border),
+                        top=Side(style=cell_border), bottom=Side(style=cell_border))
+    
+    header_fill = PatternFill(start_color=header_fill, end_color=header_fill, fill_type=header_fill_type)
     for cell in sheet[1]:
+        cell.border = thin_border
         cell.fill = header_fill
-        cell.font = Font(color="000000")
-    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
-                         top=Side(style='thin'), bottom=Side(style='thin'))
-    for row in sheet.iter_rows(min_row=1, max_row=max_row, min_col=1, max_col=max_col):
+        cell.font = Font(color=header_font_color)
+        
+    cell_fill = PatternFill(start_color=cell_fill, end_color=cell_fill, fill_type=cell_fill_type)
+    for row in sheet.iter_rows(min_row=2, max_row=max_row, min_col=1, max_col=max_col):
         for cell in row:
             cell.border = thin_border
+            cell.fill = cell_fill
+            cell.font = Font(color=cell_font_color)
+            
 
-
-def write_csv_sheet(sheet, dataset, csv_header, extra_col_name=None, extract_func=None):
-    """
-    Write rows to a CSV sheet with optional extra processing.
-    ...
-    (Documentation unchanged)
-    """
-    # Check that both or neither of the extra parameters are provided.
-    if (extra_col_name is None) != (extract_func is None):
-        raise ValueError("Both extra_col_name and extract_func must be provided together")
+def write_csv_sheet(sheet, dataset, csv_header, sheet_options, extract_config=None):
+    global COUNT
+    if extract_config is None:
+        extract_config = {}
     
-    # Remove "Host" and "Plugin Output" columns from the header.
-    csv_header_no = [col for col in csv_header if col.lower() not in {"host", "plugin output"}]
+    headers_to_remove = [h.lower() for h in sheet_options.get("headers_to_remove", [])]
+    csv_header_no = [col for col in csv_header if col.lower() not in headers_to_remove]
     
     # Build the new header.
     new_header = []
     for col in csv_header_no:
         new_header.append(col)
-        if col.lower() == "risk":
-            new_header.extend(["Hostname_original", "Hostname", "IP_original", "IP", "OS_original", "OS"])
+        if col.lower() == sheet_options.get("insert_mapping_columns_after", "Risk").lower():
+            if sheet_options.get("mapping_columns", None) is not None:
+                new_header.extend(sheet_options.get("mapping_columns", []))
     
-    # Append extra_col_name if provided, then "Status" and "Remarks".
-    if extra_col_name is not None:
-        new_header.extend([extra_col_name, "Status", "Remarks"])
-    else:
-        new_header.extend(["Status", "Remarks"])
+    if extract_config.get("extract_column_name", None) is not None:
+        new_header.extend([extract_config.get("extract_column_name")])
+    
+    additional_columns = sheet_options.get("additional_columns", None)
+    if additional_columns is not None:
+        new_header.extend(additional_columns.keys())
     
     sheet.append(new_header)
     
@@ -88,61 +109,97 @@ def write_csv_sheet(sheet, dataset, csv_header, extra_col_name=None, extract_fun
         base_row = []
         for col in csv_header_no:
             base_row.append(row.get(col, ""))
-            if col.lower() == "risk":
-                host_val = row.get("Host", "").strip()
-                # Assumes IP_REGEX is defined in the global scope.
+            if col.lower() == sheet_options.get("insert_mapping_columns_after", "Risk").lower():
+                host_val = row.get(sheet_options.get("host_column_name", "Host"), "").strip()
+                
                 if IP_REGEX.match(host_val):
-                    base_row.extend(["", "", host_val, "", "", ""])
+                    mapping_val_row = sheet_options.get("ip_match", [0, 0, 1, 0, 0, 0])[:]
                 else:
-                    base_row.extend([host_val, "", "", "", "", ""])
+                    mapping_val_row = sheet_options.get("not_ip_match", [1, 0, 0, 0, 0, 0])[:]
+                    
+                for i, val in enumerate(mapping_val_row):
+                    if val == 1:
+                        mapping_val_row[i] = host_val
+                base_row.extend(mapping_val_row)
+                
         # If extra processing is requested, create one row per extra value.
-        if extract_func is not None:
-            extra_values = extract_func(row)
+        if extract_config.get("extract_column_name", None) is not None:
+            extra_values = extract_information(row, extract_config)
             for extra in extra_values:
-                sheet.append(base_row + [extra, "Open", ""])
+                extra_row = base_row[:]
+                extra_row.extend([extra, *[value for value in additional_columns.values()]])
+                sheet.append(extra_row)
         else:
-            base_row.extend(["Open", ""])
+            base_row.extend([value for value in additional_columns.values()])
             sheet.append(base_row)
 
 
-def add_lookup_formulas(sheet, hosts_sheet):
+def add_lookup_formulas(sheet, hosts_sheet, sheet_options):
     """
     Insert lookup formulas in the host-lookup columns of the given sheet using data from the Hosts sheet.
     """
+    # Extract configuration from sheet_options
+    mapping_cols = sheet_options.get("mapping_columns", [])
+    mapping_formulas = sheet_options.get("mapping_columns_formula", {})
+    
+    # Build a dictionary mapping each configured column name to its column index in the sheet
     headers = [cell.value for cell in sheet[1]]
-    try:
-        h_orig_idx = headers.index("Hostname_original") + 1
-        h_idx = headers.index("Hostname") + 1
-        ip_orig_idx = headers.index("IP_original") + 1
-        ip_idx = headers.index("IP") + 1
-        os_orig_idx = headers.index("OS_original") + 1
-        os_idx = headers.index("OS") + 1
-    except ValueError:
-        return
+    col_indices = {}
+    for col in mapping_cols:
+        try:
+            col_indices[col] = headers.index(col) + 1
+        except ValueError:
+            # Skip if the expected column is not found
+            continue
+
+    # Determine the number of rows in the Hosts sheet (to define lookup ranges)
     host_rows = hosts_sheet.max_row
-    # Ensure that the Hosts sheet has at least one data row.
     if host_rows < 2:
         return
+
+    # Process each data row in the sheet
     for i in range(2, sheet.max_row + 1):
-        h_orig_cell = f"{get_column_letter(h_orig_idx)}{i}"
-        h_cell = f"{get_column_letter(h_idx)}{i}"
-        ip_orig_cell = f"{get_column_letter(ip_orig_idx)}{i}"
-        ip_cell = f"{get_column_letter(ip_idx)}{i}"
-        os_orig_cell = f"{get_column_letter(os_orig_idx)}{i}"
-        os_cell = f"{get_column_letter(os_idx)}{i}"
-        formula_hostname = f'=IF(ISBLANK({h_orig_cell}), IF(ISBLANK(INDEX(Hosts!$A$2:$A${host_rows}, MATCH({ip_orig_cell}, Hosts!$B$2:$B${host_rows}, 0))), "", INDEX(Hosts!$A$2:$A${host_rows}, MATCH({ip_orig_cell}, Hosts!$B$2:$B${host_rows}, 0))), {h_orig_cell})'
-        sheet.cell(row=i, column=h_idx).value = formula_hostname
-        formula_ip = f'=IF(ISBLANK({ip_orig_cell}), IF(ISBLANK(INDEX(Hosts!$B$2:$B${host_rows}, MATCH({h_orig_cell}, Hosts!$A$2:$A${host_rows}, 0))), "", INDEX(Hosts!$B$2:$B${host_rows}, MATCH({h_orig_cell}, Hosts!$A$2:$A${host_rows}, 0))), {ip_orig_cell})'
-        sheet.cell(row=i, column=ip_idx).value = formula_ip
-        formula_os = f'=IF(ISBLANK({os_orig_cell}), IF(ISBLANK(INDEX(Hosts!$C$2:$C${host_rows}, MATCH({ip_cell}, Hosts!$B$2:$B${host_rows}, 0))), "", INDEX(Hosts!$C$2:$C${host_rows}, MATCH({ip_cell}, Hosts!$B$2:$B${host_rows}, 0))), {os_orig_cell})'
-        sheet.cell(row=i, column=os_idx).value = formula_os
+        # Build a dynamic replacements dictionary for the current row.
+        # For each mapping column, we create keys like {ColumnName_cell} and {columnname_cell}
+        # to handle different naming conventions in the formula templates.
+        replacements = {"host_rows": str(host_rows), "hosts_table_name": sheet_options.get("hosts_table_name", "Hosts")}
+        for col in mapping_cols:
+            if col in col_indices:
+                cell_ref = f"{get_column_letter(col_indices[col])}{i}"
+                replacements[f"{col}_cell"] = cell_ref
+                replacements[f"{col.lower()}_cell"] = cell_ref  # Cover lower-case placeholder
+
+        # Loop over each formula in the config and apply substitutions.
+        # The key in mapping_formulas is the target column where the formula should be placed.
+        for target_col, formula_template in mapping_formulas.items():
+            if target_col not in col_indices:
+                continue  # Skip if the target column isn't in the sheet
+            formula = formula_template
+            # Replace every placeholder in the formula with the dynamic cell references
+            for placeholder, value in replacements.items():
+                formula = formula.replace(f"{{{placeholder}}}", value)
+            # Assign the computed formula to the appropriate cell in the target column
+            sheet.cell(row=i, column=col_indices[target_col]).value = formula
 
 
-def add_status_validation(sheet):
+def add_status_validation(sheet, config=None):
     """
     Add data validation for the "Status" column on the given sheet.
     Acceptable values: "-", "Open", "On-going", "Closed".
     """
+    if config is None:
+        config = {}
+        
+    DEFAULT_STATUS_MAP = {
+        "-": "ffffff",
+        "Open": "FF0000",
+        "On-going": "FFC7CE",
+        "Closed": "FFEB9C",
+        "Declared": "24FC03"
+    }
+        
+    status_map = config.get("status_map", DEFAULT_STATUS_MAP)
+    
     headers = [cell.value for cell in sheet[1]]
     try:
         status_idx = headers.index("Status") + 1
@@ -152,7 +209,7 @@ def add_status_validation(sheet):
     # Only apply data validation if there are data rows.
     if max_row < 2:
         return
-    dv = DataValidation(type="list", formula1='"-,Open,On-going,Closed,Declared"', allow_blank=False)
+    dv = DataValidation(type="list", formula1=f'"{",".join(status_map.keys())}"', allow_blank=False)
     dv.error = 'Select a value from the list'
     dv.errorTitle = 'Invalid Entry'
     dv_range = f"{get_column_letter(status_idx)}2:{get_column_letter(status_idx)}{max_row}"
@@ -160,11 +217,25 @@ def add_status_validation(sheet):
     dv.add(dv_range)
 
 
-def add_conditional_formatting(sheet):
+def add_conditional_formatting(sheet, config=None):
     """
     Add conditional formatting to the "Status" column.
     Applies a red fill for "Open" and an orange fill for "On-going".
     """
+    if config is None:
+        config = {}
+        
+    DEFAULT_STATUS_MAP = {
+        "-": "ffffff",
+        "Open": "FF0000",
+        "On-going": "FFC7CE",
+        "Closed": "FFEB9C",
+        "Declared": "24FC03"
+    }
+        
+    status_map = config.get("status_map", DEFAULT_STATUS_MAP)
+    status_fill_type = config.get("status_fill_type", "solid")
+    
     headers = [cell.value for cell in sheet[1]]
     try:
         status_idx = headers.index("Status") + 1
@@ -174,113 +245,73 @@ def add_conditional_formatting(sheet):
     if max_row < 2:
         return
     data_range = f"A2:{get_column_letter(sheet.max_column)}{max_row}"
-    formula_open = f'=${get_column_letter(status_idx)}2="Open"'
-    formula_ongoing = f'=${get_column_letter(status_idx)}2="On-going"'
-    formula_declared = f'=${get_column_letter(status_idx)}2="Declared"'
-    light_red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-    light_orange_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
-    green_fill = PatternFill(start_color="24FC03", end_color="24FC03", fill_type="solid")
-    sheet.conditional_formatting.add(data_range,
-                                     FormulaRule(formula=[formula_open], fill=light_red_fill))
-    sheet.conditional_formatting.add(data_range,
-                                     FormulaRule(formula=[formula_ongoing], fill=light_orange_fill))
-    sheet.conditional_formatting.add(data_range,
-                                     FormulaRule(formula=[formula_declared], fill=green_fill))
+    
+    for status, color in status_map.items():
+        formula = f'=${get_column_letter(status_idx)}2="{status}"'
+        fill = PatternFill(start_color=color, end_color=color, fill_type=status_fill_type)
+        sheet.conditional_formatting.add(data_range, FormulaRule(formula=[formula], fill=fill))
 
 
-def extract_linux_users(plugin_output):
-    """
-    Extract individual Linux user names from plugin output.
-    """
-    linux_re = re.compile(r"^User\s*:\s*(.+)$")
-    users = []
-    for line in plugin_output.splitlines():
-        line = line.strip()
-        m = linux_re.match(line)
-        if m:
-            user = m.group(1).strip()
-            if user:
-                users.append(user)
-    return users
+def extract_information(row, config):
+    regex_flags = re.IGNORECASE if config.get("case_insensitive") else 0
 
+    # Process lookup_columns to extract lookup values
+    lookup_col_patterns = config.get("lookup_columns", [])
+    compiled_lookup_col_patterns = [re.compile(pat, regex_flags) for pat in lookup_col_patterns]
 
-def extract_wmi_users(plugin_output):
-    """
-    Extract individual WMI user names from plugin output.
-    """
-    wmi_re = re.compile(r"^Name\s*:\s*(.+)$")
-    users = []
-    for line in plugin_output.splitlines():
-        line = line.strip()
-        if line.lower().startswith("no. of users"):
-            continue
-        m = wmi_re.match(line)
-        if m:
-            user = m.group(1).strip()
-            if user:
-                users.append(user)
-    return users
+    lookup_values = []
+    for col_name, value in row.items():
+        for pattern in compiled_lookup_col_patterns:
+            if pattern.search(col_name):
+                lookup_values.append(value.strip())
+                break
 
+    # Determine OS type based on lookup values
+    for os_type in ["linux", "windows"]:
+        lookup_patterns = config.get(os_type, {}).get("lookup_values", {})
+        compiled_lookup_patterns = [re.compile(pat, regex_flags) for pat in lookup_patterns]
 
-def extract_linux_software(plugin_output):
-    """
-    Extract Linux installed programs from plugin output.
-    """
-    programs = []
-    for line in plugin_output.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if "list of packages" in line.lower() or line.startswith("-----"):
-            continue
-        parts = line.split("|")
-        if parts:
-            prog = parts[0].strip()
-            if prog:
-                programs.append(prog)
-    return programs
-
-
-def extract_windows_software(plugin_output):
-    """
-    Extract Windows installed software entries from plugin output.
-    """
-    programs = []
-    for line in plugin_output.splitlines():
-        line = line.strip()
-        if not line or "the following software" in line.lower():
-            continue
-        if "installed on" in line.lower():
-            programs.append(line)
-    return programs
-
-
-def extract_users(row):
-    """
-    Determine and extract users from a row based on its "Name" field.
-    """
-    plugin_output = row.get("Plugin Output", "")
-    name_val = row.get("Name", "").strip()
-    if name_val == "Linux User List Enumeration":
-        return extract_linux_users(plugin_output)
-    elif name_val == "Enumerate Users via WMI":
-        return extract_wmi_users(plugin_output)
+        if any(any(p.search(val) for p in compiled_lookup_patterns) for val in lookup_values):
+            user_type = os_type
+            break
     else:
         return []
+    
 
 
-def extract_installed_software(row):
-    """
-    Determine and extract installed software from a row based on its "Name" field.
-    """
-    plugin_output = row.get("Plugin Output", "")
-    name_val = row.get("Name", "").strip()
-    if "ssh" in name_val.lower():
-        return extract_linux_software(plugin_output)
-    elif "microsoft windows installed software enumeration" in name_val.lower():
-        return extract_windows_software(plugin_output)
-    else:
-        return []
+    # Extract relevant text from specified columns
+    extract_col_patterns = config.get("extract_columns", [])
+    compiled_extract_col_patterns = [re.compile(pat, regex_flags) for pat in extract_col_patterns]
+
+    extracted_text_parts = []
+    for col_name, value in row.items():
+        for pattern in compiled_extract_col_patterns:
+            if pattern.search(col_name):
+                extracted_text_parts.append(value.strip())
+                break
+    extracted_text = "\n".join(extracted_text_parts)
+
+    # Process OS-specific extraction patterns
+    extraction_conf = config.get(user_type, {}).get("extraction", {})
+    user_regexes = extraction_conf.get("regex", [])
+    compiled_user_regexes = [re.compile(pat, regex_flags) for pat in user_regexes]
+
+    exclude_patterns = extraction_conf.get("exclude", [])
+    compiled_exclude_patterns = [re.compile(pat, regex_flags) for pat in exclude_patterns]
+
+    results = []
+    for line in extracted_text.splitlines():
+        line = line.strip()
+        if not line or any(p.search(line) for p in compiled_exclude_patterns):
+            continue
+        for regex in compiled_user_regexes:
+            match = regex.match(line)
+            if match:
+                extracted_value = match.group(1).strip() if match.groups() else line
+                results.append(extracted_value)
+                break
+
+    return results
 
 
 def hide_and_autowidth_columns(sheet, allowed_columns, auto_columns):
@@ -301,26 +332,26 @@ def hide_and_autowidth_columns(sheet, allowed_columns, auto_columns):
             sheet.column_dimensions[col_letter].width = max_length + 2
 
 
-def add_risk_font_formatting(sheet, risk_mapping):
+def add_risk_font_formatting(sheet, sheet_options):
     """
     Add conditional formatting rules to change the font color based on the risk level.
     """
     headers = [cell.value for cell in sheet[1]]
     try:
-        risk_idx = headers.index("Risk") + 1
+        idx = headers.index(sheet_options.get("text_format_column", "Risk")) + 1
     except ValueError:
         return
     max_row = sheet.max_row
     if max_row < 2:
         return
-    risk_col_letter = get_column_letter(risk_idx)
-    data_range = f"{risk_col_letter}2:{risk_col_letter}{max_row}"
-    for risk_val, color in risk_mapping.items():
-        rule = FormulaRule(formula=[f'=${risk_col_letter}2="{risk_val}"'], font=Font(color=color))
+    col_letter = get_column_letter(idx)
+    data_range = f"{col_letter}2:{col_letter}{max_row}"
+    for val, color in sheet_options.get("text_format", {}).items():
+        rule = FormulaRule(formula=[f'=${col_letter}2="{val}"'], font=Font(color=color))
         sheet.conditional_formatting.add(data_range, rule)
 
 
-def nessus_convert(csv_filename: str, excel_filename: str, logger=None, software_exclusion_keywords=None, flags={}):
+def nessus_convert(csv_filename: str, excel_filename: str, logger=None, software_exclusion_keywords=None, flags=None, config_path=None):
     """
     Convert the given CSV file into an Excel workbook.
     Six sheets are created (in order):
@@ -355,42 +386,51 @@ def nessus_convert(csv_filename: str, excel_filename: str, logger=None, software
          - Users: ["Hostname", "IP", "OS", "User", "Status", "Remarks"]
          - Installed Software: ["Hostname", "IP", "OS", "Installed Programs", "Status", "Remarks"]
     """
-    if software_exclusion_keywords is None:
-        software_exclusion_keywords = ["startup", "start-up", "os"]
+    if config_path:
+        with open(config_path, "r") as f:
+            config = json.load(f).get("excel_config", {})
+            config = {**generate_default_config(), **config}
+    else:
+        config = generate_default_config()
+    
+    if software_exclusion_keywords is not None:
+        config.setdefault("sheets", {}).setdefault("installed_software", {}).setdefault("filter_exclude", []).extend(software_exclusion_keywords)
 
-    # --- Step 1. Read CSV and split into datasets ---
-    vulnerabilities = []
-    compliance = []
-    open_ports = []
-    user_enum = []       # For user enumeration rows.
-    software_enum_dict = {}  # Group software enumeration rows by host (only first per host)
     hosts_set = set()
-
     try:
         with open(csv_filename, newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
-            csv_header = reader.fieldnames  # Includes "Host" and "Plugin Output"
+            csv_header = reader.fieldnames
             rows = list(reader)
-            rows = remove_duplicates(rows, csv_header)
+            
+            if config.get("remove_duplicates", True):
+                rows = remove_duplicates(rows, csv_header)
+                
+            sheets = {sheet_name.get("sheet_name"): [] for sheet_name in config.get("sheets", {}).values()}
             for row in rows:
-                host_val = row.get("Host", "").strip()
+                host_val = row.get(config.get("host_column_name", "Host"), "").strip()
                 if host_val:
                     hosts_set.add(host_val)
-                risk = row.get("Risk", "").strip()
-                name_val = row.get("Name", "").strip()
-                if risk in {"None", "Low", "Medium", "High", "Critical"}:
-                    vulnerabilities.append(row)
-                elif risk in {"FAILED", "WARNING"}:
-                    compliance.append(row)
-                if name_val in {"Netstat Portscanner (SSH)", "Netstat Portscanner (WMI)"}:
-                    open_ports.append(row)
-                if name_val in {"Linux User List Enumeration", "Enumerate Users via WMI"}:
-                    user_enum.append(row)
-                if "software enumeration" in name_val.lower():
-                    exclude = any(kw.lower() in name_val.lower().split(" ") for kw in software_exclusion_keywords)
-                    if not exclude and host_val and host_val not in software_enum_dict:
-                        software_enum_dict[host_val] = row
-        software_enum = list(software_enum_dict.values())
+                
+                for sheet_config in config.get("sheets", {}).values():
+                    sheet_name = sheet_config.get("sheet_name")
+                    regex_flags = re.IGNORECASE if sheet_config.get("case_insensitive", False) else 0
+
+                    # Compile the patterns
+                    compiled_col_filter_patterns = [re.compile(pat, regex_flags) for pat in sheet_config.get("column_filter_lookup", [])]
+                    compiled_filter_patterns = [re.compile(pat, regex_flags) for pat in sheet_config.get("filter", [])]
+                    compiled_filter_exclude_patterns = [re.compile(pat, regex_flags) for pat in sheet_config.get("filter_exclude", [])]
+
+                    # Helper function: returns True if any pattern in the list matches the text
+                    def matches_any(patterns, text):
+                        return any(pattern.search(text) for pattern in patterns)
+
+                    if any(
+                        matches_any(compiled_filter_patterns, value) and not matches_any(compiled_filter_exclude_patterns, value)
+                        for col_name, value in row.items() if matches_any(compiled_col_filter_patterns, col_name)
+                    ):
+                        sheets[sheet_name].append(row)
+        
     except Exception as e:
         if logger:
             logger.error(f"Error reading CSV file {csv_filename}: {e}")
@@ -401,69 +441,37 @@ def nessus_convert(csv_filename: str, excel_filename: str, logger=None, software
     default_sheet = wb.active
     wb.remove(default_sheet)
 
-    hosts_sheet = wb.create_sheet("Hosts")
-    hosts_header = ["Hostname", "IP", "OS"]
+    hosts_sheet = wb.create_sheet(config.get("hosts", {}).get("sheet_name", "Hosts"))
+    hosts_header = config.get("hosts", {}).get("headers", ["Hostname", "IP", "OS"])
     hosts_sheet.append(hosts_header)
     for host in sorted(hosts_set):
         if IP_REGEX.match(host):
-            hosts_sheet.append(["", host, ""])
+            row = config.get("hosts", {}).get("ip_match", ["", 1, ""])[:]
         else:
-            hosts_sheet.append([host, "", ""])
+            row = config.get("hosts", {}).get("not_ip_match", [1, "", ""])[:]
+            
+        for i, val in enumerate(row):
+            if val == 1:
+                row[i] = host
 
-    create_table_and_style(hosts_sheet, "Hosts")
+        hosts_sheet.append(row)
 
-    # --- Step 3. Create CSV-derived sheets ---
-    vuln_sheet = wb.create_sheet("Vulnerabilities")
-    write_csv_sheet(vuln_sheet, vulnerabilities, csv_header)
-    comp_sheet = wb.create_sheet("Compliance")
-    write_csv_sheet(comp_sheet, compliance, csv_header)
-    open_ports_sheet = wb.create_sheet("Open Ports")
-    write_csv_sheet(open_ports_sheet, open_ports, csv_header)
-    users_sheet = wb.create_sheet("Users")
-    write_csv_sheet(users_sheet, user_enum, csv_header, "User", extract_users)
-    installed_software_sheet = wb.create_sheet("Installed Software")
-    write_csv_sheet(installed_software_sheet, software_enum, csv_header, "Installed Program", extract_installed_software)
+    create_table_and_style(hosts_sheet, "Hosts", config.get("table", {}))
+    hide_and_autowidth_columns(hosts_sheet, config.get("hosts", {}).get("visible_columns", []), [])
 
-    create_table_and_style(vuln_sheet, "Vulnerabilities")
-    create_table_and_style(comp_sheet, "Compliance")
-    create_table_and_style(open_ports_sheet, "Open Ports")
-    create_table_and_style(users_sheet, "Users")
-    create_table_and_style(installed_software_sheet, "Installed Software")
+    for sheet_config in config.get("sheets", {}).values():
+        sheet_name = sheet_config.get("sheet_name")
+        sheet = wb.create_sheet(sheet_name)
+            
+        write_csv_sheet(sheet, sheets[sheet_name], csv_header, config.get("sheet_options", {}), sheet_config.get("extract_config", {}))
 
-    # --- Step 4. Add lookup formulas, validation, and conditional formatting ---
-    add_lookup_formulas(vuln_sheet, hosts_sheet)
-    add_lookup_formulas(comp_sheet, hosts_sheet)
-    add_lookup_formulas(open_ports_sheet, hosts_sheet)
-    add_lookup_formulas(users_sheet, hosts_sheet)
-    add_lookup_formulas(installed_software_sheet, hosts_sheet)
+        create_table_and_style(sheet, sheet_name, config.get("table", {}))
+        add_lookup_formulas(sheet, hosts_sheet, config.get("sheet_options", {}))
+        add_status_validation(sheet, config.get("status", {}))
+        add_conditional_formatting(sheet, config.get("status", {}))
+        hide_and_autowidth_columns(sheet, sheet_config.get("visible_columns", []), sheet_config.get("auto_width_columns", []))
+        add_risk_font_formatting(sheet, sheet_config)
 
-    add_status_validation(vuln_sheet)
-    add_status_validation(comp_sheet)
-    add_status_validation(open_ports_sheet)
-    add_status_validation(users_sheet)
-    add_status_validation(installed_software_sheet)
-
-    add_conditional_formatting(vuln_sheet)
-    add_conditional_formatting(comp_sheet)
-    add_conditional_formatting(open_ports_sheet)
-    add_conditional_formatting(users_sheet)
-    add_conditional_formatting(installed_software_sheet)
-
-    # --- Step 5. Hide unwanted columns ---
-    hide_and_autowidth_columns(hosts_sheet, ["Hostname", "IP", "OS"], [])
-    hide_and_autowidth_columns(vuln_sheet, ["Risk", "Hostname", "IP", "OS", "Name", "Synopsis", "Description", "Solution", "See Also", "Status", "Remarks"], [])
-    hide_and_autowidth_columns(comp_sheet, ["Risk", "Hostname", "IP", "OS", "Name", "Description", "Solution", "See Also", "Status", "Remarks"], [])
-    hide_and_autowidth_columns(open_ports_sheet, ["Hostname", "IP", "OS", "Protocol", "Port", "Status", "Remarks"], [])
-    hide_and_autowidth_columns(users_sheet, ["Hostname", "IP", "OS", "User", "Status", "Remarks"], [])
-    hide_and_autowidth_columns(installed_software_sheet, ["Hostname", "IP", "OS", "Installed Program", "Status", "Remarks"], [])
-
-    # --- Step 6. Add risk font conditional formatting ---
-    vuln_risk_mapping = {"Critical": "8B0000", "High": "FF0000", "Medium": "A0522D", "Low": "0000FF"}
-    add_risk_font_formatting(vuln_sheet, vuln_risk_mapping)
-    comp_risk_mapping = {"FAILED": "FF0000", "WARNING": "A0522D"}
-    add_risk_font_formatting(comp_sheet, comp_risk_mapping)
-
-    # --- Step 7. Save the workbook ---
     try:
         wb.save(excel_filename)
         if logger:
@@ -471,3 +479,156 @@ def nessus_convert(csv_filename: str, excel_filename: str, logger=None, software
     except Exception as e:
         if logger:
             logger.error(f"Error saving Excel file {excel_filename}: {e}")
+
+
+def generate_default_config():
+    return  {
+    "remove_duplicates": True,
+    "table": {
+      "table_style": "TableStyleMedium9",
+      "show_first_column": False,
+      "show_last_column": False,
+      "show_row_stripes": False,
+      "show_column_stripes": False,
+      "header_fill": "A5A5A5",
+      "header_fill_type": "solid",
+      "header_font_color": "000000",
+      "cell_fill": "ffffff",
+      "cell_fill_type": "solid",
+      "cell_border": "thin",
+      "cell_font_color": "000000"
+    },
+    "status": {
+      "status_map": {
+        "-": "ffffff",
+        "Open": "FFC7CE",
+        "On-going": "FFEB9C",
+        "Closed": "FFFFFF",
+        "Declared": "82F073"
+      },
+      "status_fill_type": "solid"
+    },
+    "hosts": {
+      "sheet_name": "Hosts",
+      "table_name": "Hosts",
+      "headers": ["Hostname", "IP", "OS"],
+      "visible_columns": ["Hostname", "IP", "OS"],
+      "ip_match": ["", 1, ""],
+      "not_ip_match": [1, "", ""]
+    },
+    "sheet_options": {
+      "host_column_name": "Host",
+      "insert_mapping_columns_after": "Risk",
+      "mapping_columns": ["Hostname_original", "Hostname", "IP_original", "IP", "OS_original", "OS"],
+      "ip_match": ["", "", 1, "", "", ""],
+      "not_ip_match": [1, "", "", "", "", ""],
+      "mapping_columns_formula": {
+        "Hostname": "=IF(ISBLANK({Hostname_original_cell}), IF(ISBLANK(INDEX({hosts_table_name}!$A$2:$A${host_rows}, MATCH({IP_original_cell}, {hosts_table_name}!$B$2:$B${host_rows}, 0))), \"\", INDEX({hosts_table_name}!$A$2:$A${host_rows}, MATCH({IP_original_cell}, {hosts_table_name}!$B$2:$B${host_rows}, 0))), {Hostname_original_cell})",
+        "IP": "=IF(ISBLANK({IP_original_cell}), IF(ISBLANK(INDEX({hosts_table_name}!$B$2:$B${host_rows}, MATCH({Hostname_original_cell}, {hosts_table_name}!$A$2:$A${host_rows}, 0))), \"\", INDEX({hosts_table_name}!$B$2:$B${host_rows}, MATCH({Hostname_original_cell}, {hosts_table_name}!$A$2:$A${host_rows}, 0))), {IP_original_cell})",
+        "OS": "=IF(ISBLANK({OS_original_cell}), IF(ISBLANK(INDEX({hosts_table_name}!$C$2:$C${host_rows}, MATCH({ip_cell}, {hosts_table_name}!$B$2:$B${host_rows}, 0))), \"\", INDEX({hosts_table_name}!$C$2:$C${host_rows}, MATCH({ip_cell}, {hosts_table_name}!$B$2:$B${host_rows}, 0))), {OS_original_cell})"
+      },
+      "additional_columns": {"Status": "Open", "Remarks": ""},
+      "headers_to_remove": ["Host"]
+    },
+    "sheets": {
+      "vulnerabilities":{
+        "sheet_name": "Vulnerabilities",
+        "case_insensitive": True,
+        "filter": ["^None$", "^Low$", "^Medium$", "^High$", "^Critical$"],
+        "column_filter_lookup": ["^Risk$"],
+        "filter_exclude": [],
+        "visible_columns": ["Risk", "Hostname", "IP", "OS", "Name", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Status", "Remarks"],
+        "auto_width_columns": [],
+        "text_format_column": "Risk",
+        "text_format": {
+          "Low": "0000FF",
+          "Medium": "A0522D",
+          "High": "FF0000",
+          "Critical": "8B0000"
+        }
+      },
+      "compliance":{
+        "sheet_name": "Compliance",
+        "case_insensitive": True,
+        "filter": ["^WARNING$", "^FAILED$"],
+        "column_filter_lookup": ["^Risk$"],
+        "filter_exclude": [],
+        "visible_columns": ["Risk", "Hostname", "IP", "OS", "Name", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Status", "Remarks"],
+        "auto_width_columns": [],
+        "text_format_column": "Risk",
+        "text_format": {
+          "WARNING": "A0522D",
+          "FAILED": "FF0000"
+        }
+      },
+      "open_ports":{
+        "sheet_name": "Open Ports",
+        "case_insensitive": True,
+        "filter": ["Netstat Portscanner \(SSH\)", "Netstat Portscanner \(WMI\)"],
+        "column_filter_lookup": ["^Name$"],
+        "filter_exclude": [],
+        "visible_columns": ["Hostname", "IP", "OS", "Protocol", "Port", "Status", "Remarks"],
+        "auto_width_columns": []
+      },
+      "users":{
+        "sheet_name": "Users",
+        "case_insensitive": True,
+        "filter": ["^Linux User List Enumeration$", "^Enumerate Users via WMI$"],
+        "column_filter_lookup": ["^Name$"],
+        "filter_exclude": [],
+        "visible_columns": ["Hostname", "IP", "OS", "User", "Status", "Remarks"],
+        "auto_width_columns": [],
+        "extract_config": {
+          "case_insensitive": True,
+          "lookup_columns": ["^Name$"],
+          "extract_columns": ["^Plugin Output$"],
+          "extract_column_name": "User",
+          "linux": {
+              "lookup_values": ["^Linux User List Enumeration$"],
+              "extraction": {
+                  "regex": ["^User\s*:\s*(.+)$"],
+                  "exclude": []
+              }
+          },
+          "windows": {
+              "lookup_values": ["^Enumerate Users via WMI$"],
+              "extraction": {
+                  "regex": ["^Name\s*:\s*(.+)$"],
+                  "exclude": ["no\.?\s*of\s*users"]
+              }
+          }
+        }
+
+      },
+      "installed_software":{
+        "sheet_name": "Installed Software",
+        "case_insensitive": True,
+        "filter": ["software enumeration"],
+        "column_filter_lookup": ["^Name$"],
+        "filter_exclude": ["identification", "startup", "start-up"],
+        "visible_columns": ["Hostname", "IP", "OS", "Installed Program", "Status", "Remarks"],
+        "auto_width_columns": [],
+
+        "extract_config": {
+          "case_insensitive": True,
+          "lookup_columns": ["^Name$"],
+          "extract_columns": ["^Plugin Output$"],
+          "extract_column_name": "Installed Program",
+          "linux": {
+              "lookup_values": ["ssh"],
+              "extraction": {
+                  "regex": [".*"],
+                  "exclude": ["list of packages", "^-+"]
+              }
+          },
+          "windows": {
+              "lookup_values": ["microsoft windows installed software enumeration"],
+              "extraction": {
+                  "regex": [".*installed on.*"],
+                  "exclude": ["the following software"]
+              }
+          }
+        }
+      }
+    }
+  }

@@ -180,10 +180,7 @@ def merge_csv_contents(csv_contents_list, output_filename, logger, mode="w"):
         logger.error(f"Error merging CSV files: {e}")
     
 
-def nessus_export(nessus_api, csv_file, flags=None):
-    if flags is None:
-        flags = {}
-    
+def nessus_export(nessus_api, csv_file, flags={}):
     # Use the --csv flag if provided; otherwise, prompt for the output filename.
     if csv_file:
         merged_filename = csv_file.strip()

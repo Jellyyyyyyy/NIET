@@ -1,8 +1,12 @@
 import getpass
+import re
+
+import requests
 
 
 def get_ascii_art():
     return r"""
+
 NNNNNNNN        NNNNNNNN IIIIIIIIII EEEEEEEEEEEEEEEEEEEEEE TTTTTTTTTTTTTTTTTTTTTTT
 N:::::::N       N::::::N I::::::::I E::::::::::::::::::::E T:::::::::::::::::::::T
 N::::::::N      N::::::N I::::::::I E::::::::::::::::::::E T:::::::::::::::::::::T
@@ -19,13 +23,8 @@ N::::::N      N::::::::N II::::::II EE::::::EEEEEEEE:::::E       TT:::::::TT
 N::::::N       N:::::::N I::::::::I E::::::::::::::::::::E       T:::::::::T      
 N::::::N        N::::::N I::::::::I E::::::::::::::::::::E       T:::::::::T      
 NNNNNNNN         NNNNNNN IIIIIIIIII EEEEEEEEEEEEEEEEEEEEEE       TTTTTTTTTTT      
-
+                                                                                                                         
 """
-
-
-def get_authors():
-    return "Made by Jeryl & Yan Zhe"
-
 
 def get_non_blank_input(prompt, password=False, logger=None):
     """Prompt the user until a non-blank input is provided."""

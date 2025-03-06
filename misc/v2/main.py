@@ -9,7 +9,7 @@ from NessusAPI import NessusAPI
 from nessus_import import nessus_import
 from nessus_export import nessus_export
 from nessus_convert import nessus_convert
-from utils import get_ascii_art, get_authors, get_non_blank_input, get_user_confirmation, get_user_input_with_default
+from utils import get_ascii_art, get_non_blank_input, get_user_confirmation, get_user_input_with_default
 
 urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -68,12 +68,9 @@ def parse_args(logger):
                                    help="Name of Excel file to output")
     convert_args_group.add_argument("-S", "--software-exclusion-keywords",
                                    help="Comma-separated list of keywords to exclude from the Installed Software sheet.")
-    convert_args_group.add_argument("-P", "--excel-config-path",
-                                   help="Path to a configuration file to use for Excel output. (e.g. /path/to/config.json)")
 
     args = parser.parse_args()
     
-    print(get_authors())
     print(get_ascii_art())
     
     if args.config:
@@ -110,14 +107,13 @@ def parse_args(logger):
             args.csv_path = config.get("csv")
             args.output_excel = config.get("excel")
             args.software_exclusion_keywords = config.get("software_exclusion_keywords")
-            args.excel_config_path = config.get("excel_config_path")
             
             if type(args.software_exclusion_keywords) == list:
                 args.software_exclusion_keywords = ",".join(args.software_exclusion_keywords)
 
     if not args.import_mode and not args.export_mode and not args.convert_mode:
         while True:
-            mode = get_non_blank_input("Would you like to import/export a Nessus scan or convert a Nessus CSV to Excel? (I/E/C): ", logger=logger).strip().lower()
+            mode = get_non_blank_input("Would you like to import, export or convert a Nessus scan? (I/E/C): ", logger=logger).strip().lower()
             if mode in ["import", "i", "im", "import mode"]:
                 args.import_mode = True
                 break
@@ -163,9 +159,6 @@ def parse_args(logger):
         args.software_exclusion_keywords = args.software_exclusion_keywords.split(",")
         if args.software_exclusion_keywords == [""]:
             args.software_exclusion_keywords = None
-            
-    if args.convert_mode and not args.excel_config_path:
-        args.excel_config_path = None
         
     return args
 
@@ -187,7 +180,7 @@ def main():
         logger.setLevel(logging.INFO)
     
     if args.convert_mode:
-        nessus_convert(args.csv_path, args.output_excel, logger, args.software_exclusion_keywords, None, args.excel_config_path)
+        nessus_convert(args.csv_path, args.output_excel, logger, args.software_exclusion_keywords)
         return
 
     nessus_api = NessusAPI(args.nessus_url.rstrip('/'), args.api_token, verify=args.secure, logger=logger)

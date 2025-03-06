@@ -117,7 +117,7 @@ def process_file(folder_id, file_path, nessus_api, verbose=False, index=None, to
     return import_response
 
 
-def nessus_import(nessus_api, directory, flags=None):
+def nessus_import(nessus_api, directory, flags={}):
     """
     Import .nessus files into Nessus.
 
@@ -131,9 +131,6 @@ def nessus_import(nessus_api, directory, flags=None):
         None
     """
     # Determine the folder to upload to.
-    if flags is None:
-        flags = {}
-    
     folders = nessus_api.get_folders()
     if flags.upload_folder:
         if flags.upload_folder in folders:

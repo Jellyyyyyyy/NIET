@@ -1,0 +1,13 @@
+{
+  "mode": "import",
+  "nessus_url": "https://localhost:8834",
+  "api_token": "e306e373-8ed6-4d01-b413-299e02037e5f",
+  "username": "admin",
+  "password": "password",
+  "secure": false,
+  "verbose": false,
+  "threads": 1,
+  "directory": ".\\",
+  "no_recursive": false,
+  "upload_folder": "My Scans"
+}
