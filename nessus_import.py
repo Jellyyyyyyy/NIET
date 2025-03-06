@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-"""
-Interactive Nessus Import Script
-
-This script uploads .nessus files found in a specified directory (with optional non‐recursive search)
-to a Nessus server. It performs login using a username/password to retrieve a session token,
-requires an API token, and then:
-  1. Uploads each file via /file/upload.
-  2. Imports the scan via /scans/import (using the returned filename).
-
-If the user did not specify an upload folder via --upload-folder, the script will prompt
-to choose (or create) a folder by entering its name or the corresponding number.
-Files are processed concurrently if the --threads flag is greater than 1.
-"""
 import os
 import sys
 import re

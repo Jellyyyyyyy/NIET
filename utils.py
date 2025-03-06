@@ -26,7 +26,7 @@ NNNNNNNN         NNNNNNN IIIIIIIIII EEEEEEEEEEEEEEEEEEEEEE       TTTTTTTTTTT
 
 
 def get_authors():
-    return "Made by Jeryl & Yan Zhe"
+    return "Made by Jellyyyyyyy & SimYanZhe"
 
 
 def get_non_blank_input(prompt, password=False, validate=None,logger=None):

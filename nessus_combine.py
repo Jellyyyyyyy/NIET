@@ -1,7 +1,6 @@
 from datetime import datetime
 import os
 import re
-import argparse
 import sys
 
 from utils import gather_nessus_files, get_user_input_with_default
