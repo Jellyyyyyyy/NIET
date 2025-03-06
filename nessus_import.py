@@ -17,7 +17,7 @@ import sys
 import re
 import concurrent.futures
 import threading
-from utils import get_non_blank_input, get_user_confirmation
+from utils import get_non_blank_input, get_user_confirmation, gather_nessus_files
 
 
 def choose_folder_interactively(nessus_api, folders):
@@ -82,23 +82,6 @@ def choose_folder_interactively(nessus_api, folders):
                         sys.exit(1)
 
 
-def gather_nessus_files(root_dir, recursive=True):
-    """Return a list of absolute paths for all .nessus files in the directory.
-       If recursive is False, only files in the root directory are returned."""
-    nessus_files = []
-    if recursive:
-        for dirpath, _, filenames in os.walk(root_dir):
-            for filename in filenames:
-                if filename.lower().endswith('.nessus'):
-                    nessus_files.append(os.path.abspath(os.path.join(dirpath, filename)))
-    else:
-        for filename in os.listdir(root_dir):
-            full_path = os.path.join(root_dir, filename)
-            if os.path.isfile(full_path) and filename.lower().endswith('.nessus'):
-                nessus_files.append(os.path.abspath(full_path))
-    return nessus_files
-
-
 def process_file(folder_id, file_path, nessus_api, verbose=False, index=None, total=None):
     """
     For a given .nessus file, first upload it via /file/upload, then import it via /scans/import.
@@ -117,7 +100,7 @@ def process_file(folder_id, file_path, nessus_api, verbose=False, index=None, to
     return import_response
 
 
-def nessus_import(nessus_api, directory, flags=None):
+def nessus_import(nessus_api, directory=None, filepaths=None, flags=None):
     """
     Import .nessus files into Nessus.
 
@@ -154,6 +137,12 @@ def nessus_import(nessus_api, directory, flags=None):
 
     # Gather .nessus files from the specified directory.
     nessus_files = gather_nessus_files(directory, recursive=flags.no_recursive)
+    if filepaths:
+        for filepath in filepaths:
+            if os.path.isfile(filepath) and filepath.endswith('.nessus'):
+                nessus_files.append(filepath)
+            else:
+                nessus_api.get_logger().error(f"File '{filepath}' is not a valid .nessus file.")
     total_files = len(nessus_files)
     nessus_api.get_logger().info(f"Found {total_files} .nessus file{'' if total_files == 1 else 's'}.")
     if total_files == 0:

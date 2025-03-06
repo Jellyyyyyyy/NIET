@@ -1,4 +1,6 @@
 import getpass
+import os
+import re
 
 
 def get_ascii_art():
@@ -27,23 +29,41 @@ def get_authors():
     return "Made by Jeryl & Yan Zhe"
 
 
-def get_non_blank_input(prompt, password=False, logger=None):
+def get_non_blank_input(prompt, password=False, validate=None,logger=None):
     """Prompt the user until a non-blank input is provided."""
     while True:
         value = getpass.getpass(prompt).strip() if password else input(prompt).strip()
         if value:
-            return value
+            if validate:
+                if re.fullmatch(validate, value):
+                    return value
+                else:
+                    if logger:
+                        logger.error(f"Invalid input. Please try again.")
+                    else:
+                        print(f"Invalid input. Please try again.")
+            else:
+                return value
         if logger:
             logger.error("Input cannot be blank. Please try again.")
         else:
             print("Input cannot be blank. Please try again.")
             
             
-def get_user_input_with_default(prompt, default, logger=None):
+def get_user_input_with_default(prompt, default, validate=None, logger=None):
     """Prompt the user for input, with a default value if the user just hits enter."""
     value = input(prompt).strip()
     if value:
-        return value
+        if validate:
+            if re.fullmatch(validate, value):
+                return value
+            else:
+                if logger:
+                    logger.error(f"Invalid input. Please try again.")
+                else:
+                    print(f"Invalid input. Please try again.")
+        else:
+            return value
     if default:
         if logger:
             logger.debug(f"Using default value: {default}")
@@ -60,6 +80,23 @@ def get_user_confirmation(prompt, default=None):
             return True
         if value in ["n", "no"] or (default is False and value == ""):
             return False
+        
+        
+def gather_nessus_files(root_dir, recursive=True):
+    """Return a list of absolute paths for all .nessus files in the directory.
+       If recursive is False, only files in the root directory are returned."""
+    nessus_files = []
+    if recursive:
+        for dirpath, _, filenames in os.walk(root_dir):
+            for filename in filenames:
+                if filename.lower().endswith('.nessus'):
+                    nessus_files.append(os.path.abspath(os.path.join(dirpath, filename)))
+    else:
+        for filename in os.listdir(root_dir):
+            full_path = os.path.join(root_dir, filename)
+            if os.path.isfile(full_path) and filename.lower().endswith('.nessus'):
+                nessus_files.append(os.path.abspath(full_path))
+    return nessus_files
           
           
 def parse_range_input(input_str, max_val):

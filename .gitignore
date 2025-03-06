@@ -1,7 +1,10 @@
 venv
 __pycache__
 dist
+build
+examples
 *.html
 *.csv
 *.xlsx
 *.nessus
+*.spec

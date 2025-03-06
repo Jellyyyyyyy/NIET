@@ -1,0 +1,8 @@
+{
+  "mode": "combine",
+  "verbose": false,
+  "remove_duplicates": "ask",
+  "output": "o2",
+  "scan_name": "Merged Scan",
+  "directory": "examples"
+}
