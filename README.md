@@ -1,15 +1,15 @@
-# Nessus Import/Export Tool
+# 📡 Nessus Import/Export Tool
 
-This project automates importing, exporting, converting, and combining Nessus vulnerability scans using Nessus' Web API. Developed primarily for Windows environments, this tool streamlines the management of Nessus scans through an easy-to-use command-line interface.
+[Nessus](https://www.tenable.com/products/nessus) is a widely-used vulnerability scanning tool. This project automates importing, exporting, converting, and combining Nessus vulnerability scans using Nessus' Web API. Developed primarily for Windows environments, this tool streamlines the management of Nessus scans through an easy-to-use command-line interface
 
-## Features
+## ✨ Features
 
 - **[Import Scans](#import-mode)**: Import `.nessus` files to Nessus.
 - **[Export Scans](#export-mode)**: Export Nessus scans to CSV or Excel.
 - **[Convert CSV to Excel](#convert-mode)**: Format Nessus CSV outputs into structured Excel files.
 - **[Combine Scans](#combine-mode)**: Merge multiple `.nessus` files into a single file.
 
-## Requirements
+## 📝 Requirements
 
 - **Python 3.12+** (Developed and tested on Windows 10/11)
 - Access to Nessus (tested primarily with Nessus Web Client API)
@@ -27,21 +27,21 @@ pip install -r requirements.txt
 - openpyxl==3.1.5
 - idna==3.10
 
-## Usage
+## 🔎 Usage
 
 ```bash
 python main.py [MODE] [OPTIONS]
 ```
 
-## Building
+## 🚜 Building
 
 You can get the latest compiled release in the [Releases](https://github.com/Jellyyyyyyy/NIET/releases) section. If you want to, you can build it yourself as well (Pyinstaller is required for compiling):
 
 ```bash
-pyinstaller --onefile main.y
+pyinstaller --onefile main.py
 ```
 
-## Modes
+## ⚡ Modes
 
 ### Import Mode
 
@@ -121,15 +121,7 @@ Combine multiple `.nessus` scan files into a single consolidated file, handling 
 }
 ```
 
-## Utility Functions (`utils.py`)
-
-Utility functions supporting the core modes include:
-
-- Interactive user prompts with input validation.
-- Recursive search for `.nessus` files.
-- Parsing numerical and range-based inputs for selection.
-
-## Obtaining API Token
+## 🌐 Obtaining API Token
 
 Obtain the required API token via browser developer tools:
 
@@ -140,7 +132,7 @@ Obtain the required API token via browser developer tools:
 
 *Note: This method differs from the officially documented Nessus API token process.*
 
-## Project Structure
+## ⚙️ Project Structure
 
 - `main.py`: Main entry point.
 - `NessusAPI.py`: Authentication and API interactions.
@@ -150,19 +142,19 @@ Obtain the required API token via browser developer tools:
 - `nessus_combine.py`: Combines `.nessus` files.
 - `utils.py`: Helper functions used across modes.
 
-## Authors
+## 🧑‍💻 Authors
 
 - [Jellyyyyyyy](https://github.com/Jellyyyyyyy)
 - [SimYanZhe](https://github.com/SimYanZhe)
 
-## License
+## 📃 License
 
 Distributed under the MIT License. See [LICENSE](https://github.com/Jellyyyyyyy/NIET/blob/main/LICENSE) for details.
 
-## Support
+## 🛟 Support
 
 For issues or feature requests, please create a GitHub issue.
 
-## GitHub
+## 💎 GitHub
 
 [Repository Link](https://github.com/Jellyyyyyyy/NIET)
