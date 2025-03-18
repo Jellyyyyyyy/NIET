@@ -4,5 +4,7 @@
   "remove_duplicates": "ask",
   "output": "o2",
   "scan_name": "Merged Scan",
-  "directory": "examples"
+  "directory": "examples",
+  "compliance": "inject",
+  "compliance_path": "compliance.txt"
 }
