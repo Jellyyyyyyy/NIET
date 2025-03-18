@@ -1,8 +1,8 @@
 import os
 import sys
 import concurrent.futures
-from utils import get_non_blank_input, get_user_confirmation, get_user_input_with_default, parse_range_input
-from nessus_convert import nessus_convert
+from utils.helper import get_non_blank_input, get_user_confirmation, get_user_input_with_default, parse_range_input
+from modes.convert import nessus_convert
 
 
 def check_file_mode(nessus_api, filename, prompt_text="File '{}' already exists. Overwrite (O), append (A), enter new name (N), or cancel (C)?: "):

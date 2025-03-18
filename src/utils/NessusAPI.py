@@ -67,18 +67,39 @@ class NessusAPI:
         except Exception as e:
             self.logger.error(f"Error logging in to Nessus: {e}")
             return None
-
+        
     def check_connection(self):
         """Check if the Nessus server is reachable via the /server/status endpoint."""
+        base_url = self.base_url
+        session = self.session
+        verify = self.verify
+        logger = self.logger
+
         try:
-            url = f"{self.base_url.rstrip('/')}/server/status"
-            resp = self.session.get(url, verify=self.verify, timeout=10)
+            url = f"{base_url.rstrip('/')}/server/status"
+            resp = session.get(url, verify=verify, timeout=10)
             resp.raise_for_status()
             data = resp.json()
-            self.logger.debug(f"Nessus server status: {data}")
+            logger.debug(f"Nessus server status: {data}")
             return True
         except Exception as e:
-            self.logger.error(f"Unable to connect to Nessus server at {self.base_url}: {e}")
+            logger.error(f"Unable to connect to Nessus server at {base_url}: {e}")
+            return False
+
+    @classmethod
+    def check_connection_from_url(cls, url, verify=False):
+        session = requests.Session()
+        logger = logging.getLogger(__name__)
+
+        try:
+            full_url = f"{url.rstrip('/')}/server/status"
+            resp = session.get(full_url, verify=verify, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            logger.debug(f"Nessus server status: {data}")
+            return True
+        except Exception as e:
+            logger.error(f"Unable to connect to Nessus server at {url}: {e}")
             return False
         
     def get_api_token_automatically(self):
