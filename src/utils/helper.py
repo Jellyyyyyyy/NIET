@@ -233,7 +233,6 @@ def check_for_susan_items_csv(file_path, column_name, susan_items=None):
     found_items = []
     for strToFind in susan_items:
         # Filter rows where column contains the text
-        print(strToFind)
         matches = df[column_name].astype(str).str.contains(re.escape(strToFind), case=False, na=False, regex=True)
 
         # Check if any matches are found
