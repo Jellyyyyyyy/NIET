@@ -3,7 +3,7 @@ import sys
 import re
 import concurrent.futures
 import threading
-from utils.helper import get_non_blank_input, get_user_confirmation, gather_nessus_files
+from utils.helper import check_for_susan_items_xml, get_susan_items_to_remove, get_non_blank_input, get_user_confirmation, gather_nessus_files, remove_report_items_from_xml
 
 
 def choose_folder_interactively(nessus_api, folders):
@@ -137,6 +137,29 @@ def nessus_import(nessus_api, directory=None, filepaths=None, flags=None):
     if total_files == 0:
         nessus_api.get_logger().info(f"No .nessus files found in directory {directory}")
         sys.exit(1)
+    
+    found = False
+    for file in nessus_files:
+        if check_for_susan_items_xml(file, flags.susan_items_to_remove or None, logger=nessus_api.get_logger()):
+            nessus_api.get_logger().debug(f"Susan items found in {file}.")
+            found = True
+            
+    if found and not flags.remove_susan and get_user_confirmation(f"Susan items found. Do you want to remove them? This will edit the Nessus file directly. (Y/n): ", default=True):
+        flags.remove_susan = True
+        
+    if flags.remove_susan:
+        if flags.susan_all_files:
+            for file in nessus_files:
+                items_to_remove = flags.susan_items_to_remove or get_susan_items_to_remove(file_type="XML", logger=nessus_api.get_logger())
+                if items_to_remove:
+                    nessus_api.get_logger().debug(f"Removing Susan items {items_to_remove} from {file}...")
+                    remove_report_items_from_xml(file, items_to_remove, nessus_api.get_logger())
+        else:
+            items_to_remove = flags.susan_items_to_remove or get_susan_items_to_remove(file_type="XML", logger=nessus_api.get_logger())
+            if items_to_remove:
+                for file in nessus_files:
+                    nessus_api.get_logger().debug(f"Removing Susan items {items_to_remove} from {file}...")
+                    remove_report_items_from_xml(file, items_to_remove, nessus_api.get_logger())
 
     # Set up progress tracking.
     progress_lock = threading.Lock()

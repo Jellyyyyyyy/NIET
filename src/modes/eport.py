@@ -1,7 +1,7 @@
 import os
 import sys
 import concurrent.futures
-from utils.helper import get_non_blank_input, get_user_confirmation, get_user_input_with_default, parse_range_input
+from utils.helper import check_for_susan_items_csv, get_non_blank_input, get_susan_items_to_remove, get_user_confirmation, get_user_input_with_default, parse_range_input, remove_csv_rows_with_text, remove_report_items_from_xml
 from modes.convert import nessus_convert
 
 
@@ -246,7 +246,25 @@ def nessus_export(nessus_api, csv_file, flags=None):
     csv_contents_list = [csv_contents[scan_id] for scan_id in ordered_scan_ids if scan_id in csv_contents]
 
     merge_csv_contents(csv_contents_list, file_name_to_export_to, nessus_api.get_logger(), mode=file_mode)
-    nessus_api.get_logger().info("CSV merge process complete.")
+    nessus_api.get_logger().debug("CSV merge process complete.")
+    
+    found = False
+    if check_for_susan_items_csv(file_name_to_export_to, flags.susan_csv_column or None):
+        nessus_api.get_logger().debug(f"Susan items found in {file_name_to_export_to}.")
+        found = True
+            
+    if found and not flags.remove_susan and get_user_confirmation(f"Susan items found. Do you want to remove them? This will edit the CSV file directly. (Y/n): ", default=True):
+        flags.remove_susan = True
+
+    if flags.remove_susan:
+        items_to_remove = flags.susan_items_to_remove or get_susan_items_to_remove(file_type="CSV", logger=nessus_api.get_logger())
+        if not flags.susan_csv_column:
+            column_name = get_user_input_with_default("Enter the column name to check for Susan items (e.g. 'Description') [Description]: ", logger=nessus_api.get_logger(), default="Description")
+            
+        if items_to_remove:
+            nessus_api.get_logger().info("Removing Susan items from CSV...")
+            nessus_api.get_logger().debug(f"Removing Susan items {items_to_remove} from {file_name_to_export_to}...")
+            remove_csv_rows_with_text(file_name_to_export_to, column_name, items_to_remove, nessus_api.get_logger())
 
     # If an Excel output filename is provided, convert the CSV to Excel.
     if flags.excel:
