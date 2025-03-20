@@ -41,13 +41,18 @@ def add_general_arguments(parser):
     """Add general arguments applicable to all modes."""
     general_group = parser.add_argument_group("General Settings")
     general_group.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
-    general_group.add_argument("-t", "--threads", type=int, default=1, help="Number of threads")
+    general_group.add_argument("-t", "--threads", type=int, default=1, help="Number of threads. Only for Import and Export modes (Untested)")
     general_group.add_argument("-k", "--config", help="Path to configuration file")
-    general_group.add_argument("-d", "--directory", help="Directory containing .nessus files")
-    general_group.add_argument("-N", "--no-recursive", action="store_false", help="Disable recursive search")
-    general_group.add_argument("-f", "--filepaths", nargs="*", help="List of .nessus filepaths")
-    general_group.add_argument("-o", "--output", help="Output file path")
+    general_group.add_argument("-d", "--directory", help="Directory containing .nessus files (For Import and Combine modes)")
+    general_group.add_argument("-n", "--no-recursive", action="store_false", help="Disable recursive search (Used when specifying a directory)")
+    general_group.add_argument("-f", "--filepaths", nargs="*", help="List of .nessus filepaths (For Import and Combine modes)")
+    general_group.add_argument("-o", "--output", help="Output filepath")
     general_group.add_argument("--csv", help="CSV file path")
+    general_group.add_argument("--susan", help="Filepath to Susan output file. This will be used to remove Susan items from ALL hosts")
+    general_group.add_argument("--remove-susan", action="store_true", help="Remove Susan items from files (Only for Import and Export modes)")
+    general_group.add_argument("--susan-all-files", action="store_true", help="Will ask which Susan items to remove for all files to be imported (Only for Import mode)")
+    general_group.add_argument("--susan-items-to-remove", nargs="*", help="List of Susan items to remove (Refer to README for list of predefined Susan items)")
+    general_group.add_argument("--susan-csv-column", help="Column name to check for Susan items (Only for Export mode)")
 
 
 def add_mode_specific_arguments(parser):
@@ -456,7 +461,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nProgram interrupted by user. Exiting...")
         sys.exit(0)
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        sys.exit(1)
+    # except Exception as e:
+        # print(f"An error occurred: {e}")
+        # sys.exit(1)
 
