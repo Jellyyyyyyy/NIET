@@ -9,7 +9,7 @@ from openpyxl.formatting.rule import FormulaRule
 from openpyxl.utils import get_column_letter
 
 # Module-level constant for IP matching.
-IP_REGEX = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+IP_REGEX = None
 
 
 def remove_duplicates(rows, keys):
@@ -80,7 +80,7 @@ def create_table_and_style(sheet, table_name, config=None):
             
 
 def write_csv_sheet(sheet, dataset, csv_header, sheet_options, extract_config=None):
-    global COUNT
+    global COUNT, IP_REGEX
     if extract_config is None:
         extract_config = {}
     
@@ -386,6 +386,7 @@ def nessus_convert(csv_filename: str, excel_filename: str, logger=None, software
          - Users: ["Hostname", "IP", "OS", "User", "Status", "Remarks"]
          - Installed Software: ["Hostname", "IP", "OS", "Installed Programs", "Status", "Remarks"]
     """
+    global IP_REGEX
     if config_path:
         with open(config_path, "r") as f:
             config = json.load(f).get("excel_config", {})
@@ -395,6 +396,8 @@ def nessus_convert(csv_filename: str, excel_filename: str, logger=None, software
     
     if software_exclusion_keywords is not None:
         config.setdefault("sheets", {}).setdefault("installed_software", {}).setdefault("filter_exclude", []).extend(software_exclusion_keywords)
+
+    IP_REGEX = re.compile(config.get("ip_regex", r"^((25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d|[Xx]{1,3})\.){3}(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d|[Xx]{1,3})$"))
 
     hosts_set = set()
     try:
@@ -483,6 +486,7 @@ def nessus_convert(csv_filename: str, excel_filename: str, logger=None, software
 
 def generate_default_config():
     return  {
+    "ip_regex": r"^((25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d|[Xx]{1,3})\.){3}(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d|[Xx]{1,3})$",
     "remove_duplicates": True,
     "table": {
       "table_style": "TableStyleMedium9",

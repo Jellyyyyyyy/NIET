@@ -7,6 +7,7 @@
   "excel_config_path": "C:\\Users\\Jelly\\Documents\\Code\\Python\\Nessus scripts\\configs\\convert_config.json",
   "excel_config": {
     "remove_duplicates": true,
+    "ip_regex": "^((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d|[Xx]{1,3})\\.){3}(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]?\\d|[Xx]{1,3})$",
     "table": {
       "table_style": "TableStyleMedium9",
       "show_first_column": false,
