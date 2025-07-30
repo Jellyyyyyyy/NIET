@@ -257,14 +257,27 @@ def nessus_export(nessus_api, csv_file, flags=None):
         flags.remove_susan = True
 
     if flags.remove_susan:
-        items_to_remove = flags.susan_items_to_remove or get_susan_items_to_remove(file_type="CSV", logger=nessus_api.get_logger())
+        items_to_remove = (
+            flags.susan_items_to_remove
+            or get_susan_items_to_remove(file_type="CSV", logger=nessus_api.get_logger())
+        )
         if not flags.susan_csv_column:
-            column_name = get_user_input_with_default("Enter the column name to check for Susan items (e.g. 'Description') [Description]: ", logger=nessus_api.get_logger(), default="Description")
-            
+            column_name = get_user_input_with_default(
+                "Enter the column name to check for Susan items (e.g. 'Description') [Description]: ",
+                logger=nessus_api.get_logger(),
+                default="Description",
+            )
+        else:
+            column_name = flags.susan_csv_column
+
         if items_to_remove:
             nessus_api.get_logger().info("Removing Susan items from CSV...")
-            nessus_api.get_logger().debug(f"Removing Susan items {items_to_remove} from {file_name_to_export_to}...")
-            remove_csv_rows_with_text(file_name_to_export_to, column_name, items_to_remove, nessus_api.get_logger())
+            nessus_api.get_logger().debug(
+                f"Removing Susan items {items_to_remove} from {file_name_to_export_to}..."
+            )
+            remove_csv_rows_with_text(
+                file_name_to_export_to, column_name, items_to_remove, nessus_api.get_logger()
+            )
 
     # If an Excel output filename is provided, convert the CSV to Excel.
     if flags.excel:
