@@ -61,8 +61,8 @@ def add_mode_specific_arguments(parser):
     import_group.add_argument("--upload-folder", help="Folder name for scan uploads")
 
     export_group = parser.add_argument_group("Export Mode Settings")
-    export_group.add_argument("--excel", nargs="?", const=True, 
-                              help="Enables outputing an Excel file on top of the CSV. Specify the filepath with this flag or in the prompts.")
+    export_group.add_argument("--excel", nargs="?", const=True,
+                              help="Enables outputting an Excel file on top of the CSV. Specify the filepath with this flag or in the prompts.")
 
     convert_group = parser.add_argument_group("Convert Mode Settings")
     convert_group.add_argument("--software-exclusion-keywords", help="Keywords to exclude")
